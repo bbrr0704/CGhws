@@ -21,11 +21,14 @@ body {
 <body>
 <div id="info">Homework 1
 <br>
+<button id='add'>
++10
+</button>
 <button id='pause'>
-Pause
+開始/暫停
 </button>
 <button id='restart'>
-Restart
+Reset
 </button>
 <button id='switch'>
 連續/不連續
@@ -38,38 +41,58 @@ Restart
 <script src="https://threejs.org/examples/js/controls/OrbitControls.js">
 </script>
 <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
-
+<audio id="roar" style="display:none">
+<source src="https://bbrr0704.github.io/CGhws/sounds/YajuRoar.wav" type='audio/wav'>
+</audio>
 
 <script>
-
+$('#add').click (
+	function() {
+  	time -= 10;
+    c_time -=1000
+  	pointer.rotation.y = -time*(Math.PI/30);
+	}
+);
 $('#pause').click (
 
    function() {
+   if(c_time >= 0 )
+  	{
+  		console.log("nope");
+      
+  	}
+    else
+    {
       pause = !pause;
-      clearInterval(timer);
-      clearInterval(c_timer);
+      start = true;
+    
+     		clearInterval(timer);
+      	clearInterval(c_timer);
+      
       if(!pause)
       {
       	var tmp_timer = setTimeout(pauseToStart,1000-((c_time*100)%1000));
-        
-        
-        
+       
         /////////////////////////////////
       	c_timer = setInterval(c_one,10);
       }
+      
     }
+   }
 );
 $('#restart').click (
 
    function() {
       time = 0;
       clearInterval(timer);
-      timer = setInterval(one,1000);
+      //timer = setInterval(one,1000);
       //////////////////
       c_time = 0;
       clearInterval(c_timer);
-      c_timer = setInterval(c_one,10);
+      //c_timer = setInterval(c_one,10);
       
+      pause = true;
+      start = false;
     }
 );
 $('#switch').click (
@@ -82,13 +105,16 @@ $('#switch').click (
 var camera, scene, renderer, timer ,c_timer;
 var pointer;
 var time = 0 , c_time = 0;
-var continous = false , pause = false;
+var continous = false , pause = true , tmpcheck = true , start = false;
+var clockSound;
 
 init();
 animate();
 
 function init() {
 
+	clockSound = document.getElementById ('roar');
+	
   scene = new THREE.Scene();
 
   renderer = new THREE.WebGLRenderer();
@@ -117,10 +143,12 @@ function init() {
   
   buildScale();
 
-   
-  timer = setInterval(one,1000);
-  c_timer = setInterval(c_one,10);
-  
+  if(!pause && tmpcheck)
+  {
+  	tmpcheck = false;
+  	timer = setInterval(one,1000);
+  	c_timer = setInterval(c_one,10);
+  }
   
   
 
@@ -146,6 +174,14 @@ function animate() {
   pointer.rotation.y = -time*(Math.PI/30);
  
   
+  if(c_time >= 0 && start)
+  {
+  	pause = true;
+    clearInterval(timer);
+    clearInterval(c_timer);
+	clockSound.play();
+  }
+  
 }
 function pauseToStart()
 {
@@ -154,7 +190,7 @@ function pauseToStart()
 }
 function buildScale()
 {
-var b1 = new THREE.Mesh (new THREE.CircleGeometry (1.5,16), new THREE.MeshBasicMaterial({color:'red'}));
+var b1 = new THREE.Mesh (new THREE.CircleGeometry (1.5,16), new THREE.MeshBasicMaterial({color:'blue'}));
 b1.rotateX(-Math.PI/2)
 b1.position.set(0,0.2,-13);
 var b2 = new THREE.Mesh (new THREE.CircleGeometry (1.5,16), new THREE.MeshBasicMaterial({color:'red'}));
