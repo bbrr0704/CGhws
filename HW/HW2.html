@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+#info {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #ffff00
+}
+
+body {
+  overflow: hidden;
+}
+</style>
+</head>
+
+<body>
+<div id="info">homework 2
+</div>
+
+<script src="https://threejs.org/build/three.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js">
+</script>
+<script src="https://jyunming-chen.github.io/tutsplus/js/KeyboardState.js"></script>
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+
+<script>
+var camera, scene, renderer;
+var cameraHUD1, cameraHUD2, sceneHUD;
+var keyboard = new KeyboardState();
+var clock,dt;
+
+var car, body;
+var cy1, cy2, cy3;
+var pos = new THREE.Vector3();
+var vel = new THREE.Vector3();
+var force = new THREE.Vector3();
+var power, angle;
+
+(function() {
+  Math.clamp = function(val, min, max) {
+    return Math.min(Math.max(val, min), max);
+
+  }
+})();
+
+init();
+animate();
+
+function buildVehicle() {
+  var car = new THREE.Object3D();
+  var mat = new THREE.MeshPhongMaterial({
+    color: 'white'
+  });
+  var wheelgem = new THREE.CylinderGeometry(2, 2, 1, 24);
+
+  var body = new THREE.Mesh(new THREE.BoxGeometry(12, 5, 8), mat);
+  car.add(body);
+  body.position.y = 3;
+
+  var wheel1 = new THREE.Mesh(wheelgem, mat);
+  car.add(wheel1);
+  var wheel2 = new THREE.Mesh(wheelgem, mat);
+  car.add(wheel2);
+  var wheel3 = new THREE.Mesh(wheelgem, mat);
+  car.add(wheel3);
+  var wheel4 = new THREE.Mesh(wheelgem, mat);
+  car.add(wheel4);
+
+  wheel1.position.set(6, 0, 4);
+  wheel1.rotation.x = Math.PI / 2;
+  wheel2.position.set(-6, 0, 4);
+  wheel2.rotation.x = Math.PI / 2;
+  wheel3.position.set(-6, 0, -4);
+  wheel3.rotation.x = Math.PI / 2;
+  wheel4.position.set(6, 0, -4);
+  wheel4.rotation.x = Math.PI / 2;
+
+  var pointer = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 0, 10, 4), mat);
+  pointer.rotation.z = Math.PI / 8;
+  pointer.rotation.x = Math.PI;
+  pointer.position.set(6, 5, 0);
+
+  car.add(pointer);
+
+  return car;
+}
+
+function buildObstacle() {
+
+  var cyGroup = new THREE.Group();
+
+   cy1 = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 10, 16),
+    new THREE.MeshBasicMaterial({
+      color: 'green'
+    }));
+  cy1.position.set(-70, 5, 20);
+  cyGroup.add(cy1);
+
+   cy2 = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 10, 16),
+    new THREE.MeshBasicMaterial({
+      color: 'green'
+    }));
+  cy2.position.set(30, 5, 60);
+  cyGroup.add(cy2);
+
+   cy3 = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 10, 16),
+    new THREE.MeshBasicMaterial({
+      color: 'green'
+    }));
+  cy3.position.set(60, 5, -5);
+  cyGroup.add(cy3);
+
+  scene.add(cyGroup);
+}
+
+function initHUD() {
+  // sceneHUD: a simple line boundary
+  sceneHUD = new THREE.Scene();
+  cameraHUD1 = new THREE.OrthographicCamera(-10.5, 10.5, 10.5, -10.5);
+  cameraHUD1.position.z = 20; // for border
+
+  cameraHUD2 = new THREE.OrthographicCamera(-105, 105, 105, -105);
+  cameraHUD2.position.set(0, 35, 0)
+  cameraHUD2.up.set(0, 0, -1) // for top view
+  cameraHUD2.lookAt(new THREE.Vector3())
+
+}
+
+function init() {
+
+  clock = new THREE.Clock();
+  scene = new THREE.Scene();
+
+  camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+  camera.position.set(0, 30, 25);
+  scene.add(camera);
+
+  var gridXZ = new THREE.GridHelper(200, 20, 'red', 'white');
+  scene.add(gridXZ);
+
+  renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x888888);
+
+  document.body.appendChild(renderer.domElement);
+  ////////////////////////////////////////////////////////////////////////
+  power = 5.0;
+  angle = 0.0;
+
+  car = buildVehicle();
+  scene.add(car)
+
+
+  buildObstacle();
+
+
+  let pointLight = new THREE.PointLight('white', 100)
+  pointLight.position.set(0, 20, 0);
+  scene.add(pointLight)
+
+
+  initHUD();
+  renderer.autoClear = false;
+
+}
+
+function update(dt) {
+
+  keyboard.update();
+
+  if (vel.length() > 0) {
+    angle = 1.5 * Math.PI + Math.atan2(vel.x, vel.z);
+  }
+
+  if (keyboard.pressed("space"))
+    power = 0.1;
+  if (keyboard.pressed("up"))
+    power *= 1.2;
+  if (keyboard.pressed("down"))
+    power /= 1.2;
+
+  power = Math.clamp(power, 0, 80.0);
+
+
+  var angle_thrust = angle;
+  if (keyboard.pressed("left"))
+    angle_thrust += 0.3;
+  if (keyboard.pressed("right"))
+    angle_thrust -= 0.3;
+
+  // compute force
+  var thrust = new THREE.Vector3(1, 0, 0).multiplyScalar(power).applyAxisAngle(new THREE.Vector3(0, 1, 0), angle_thrust);
+  force.copy(thrust);
+  force.add(vel.clone().multiplyScalar(-2))
+
+  // eulers
+  vel.add(force.clone().multiplyScalar(dt));
+  pos.add(vel.clone().multiplyScalar(dt));
+}
+
+function animate() {
+
+collisionDetect(cy1);
+collisionDetect(cy2);
+collisionDetect(cy3);
+  //////////////////////////////////////////////
+   dt = clock.getDelta();
+  update(dt);
+
+  // car update
+  car.position.copy(pos);
+  car.rotation.y = angle;
+
+  var camPos = car.position.clone();
+  camPos.y += 8;
+
+
+  camera.position.copy(camPos);
+  camera.rotation.y = angle - Math.PI / 2;
+
+
+  requestAnimationFrame(animate);
+  render();
+}
+
+function render() {
+  var WW = window.innerWidth;
+  var HH = window.innerHeight;
+
+  renderer.setScissorTest(true);
+
+  renderer.setViewport(0, 0, WW / 2, HH);
+  camera.aspect = WW / HH;
+  camera.updateProjectionMatrix();
+
+  renderer.setScissor(0, 0, WW / 2, HH);
+  renderer.clear();
+  renderer.render(scene, camera);
+
+  renderer.setViewport(WW / 2, 0, WW / 2, HH);
+  renderer.setScissor(WW / 2, 0, WW / 2, HH);
+  // no need to set aspect (since it is still ONE)
+  renderer.clear(); // important!
+  renderer.render(sceneHUD, cameraHUD1); // border
+  renderer.render(scene, cameraHUD2); // topview
+
+  renderer.setScissorTest(false);
+}
+
+function Check_Intersect(Rect, C, Rad) {
+  const Rad2 = Rad * Rad;
+
+  /* Translate coordinates, placing C at the origin. */
+  // duplicate R object here for computation ...
+  let R;
+  R = objectCopy(Rect);
+
+  R.max.x -= C.position.x;
+  R.max.z -= C.position.z;
+  R.min.x -= C.position.x;
+  R.min.z -= C.position.z;
+
+
+  if (R.max.x < 0) /* R to left of circle center */
+    if (R.max.z < 0) /* R in lower left corner */
+      return ((R.max.x * R.max.x + R.max.z * R.max.z) < Rad2);
+    else if (R.min.z > 0) /* R in upper left corner */
+    return ((R.max.x * R.max.x + R.min.z * R.min.z) < Rad2);
+  else /* R due West of circle */
+    return (Math.abs(R.max.x) < Rad);
+  else if (R.min.x > 0) /* R to right of circle center */
+    if (R.max.z < 0) /* R in lower right corner */
+      return ((R.min.x * R.min.x + R.max.z * R.max.z) < Rad2);
+    else if (R.min.z > 0) /* R in upper right corner */
+    return ((R.min.x * R.min.x + R.min.z * R.min.z) < Rad2);
+  else /* R due East of circle */
+    return (R.min.x < Rad);
+  else /* R on circle vertical centerline */
+    if (R.max.z < 0) /* R due South of circle */
+      return (Math.abs(R.max.z) < Rad);
+    else if (R.min.z > 0) /* R due North of circle */
+    return (R.min.z < Rad);
+  else /* R contains circle centerpoint */
+    return (true);
+}
+
+function makeRect(rect) {
+  let Rect = {};
+  Rect.max = car.localToWorld(new THREE.Vector3(10, 0, 5));
+  Rect.min = car.localToWorld(new THREE.Vector3(-10, 0, -5));
+  return Rect;
+}
+
+function objectCopy(src) {
+  return JSON.parse(JSON.stringify(src));
+}
+
+function collisionDetect(circle){
+let Rect = makeRect(body);
+  if (Check_Intersect(Rect, circle, 10)) {
+    circle.material.color = new THREE.Color('red');
+    
+    if (keyboard.pressed("down"))
+    {
+    	power = 5;
+    	
+      pos.sub(vel.clone().multiplyScalar(dt));
+    }
+    else
+    {
+    vel.set(0,0,0);
+    	
+    }
+    
+  } else {
+    circle.material.color = new THREE.Color('green');
+  }
+}
+
+</script>
+</body>
+
+</html>
