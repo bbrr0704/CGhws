@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+#info {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #ffff00
+}
+
+body {
+  overflow: hidden;
+}
+</style>
+</head>
+
+<body>
+<div id="info">hw4
+</div>
+<script src="https://threejs.org/build/three.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+
+<script>
+var camera, scene, renderer;
+var flameMesh = [] , indiv = [];
+var num = 0;
+var candle = [];
+var flameOff = false;
+
+var raycaster;
+var mouse = new THREE.Vector2();
+var pickables = [];
+var objects;
+
+
+function makeCandle() {
+	var tmp = new THREE.Group();
+  
+  let body = new THREE.Mesh (new THREE.CylinderGeometry(5,5,20,6), new THREE.MeshNormalMaterial());
+
+  body.position.y = 10;
+  
+  tmp.add(body);
+	return tmp;
+}
+
+class Flame{
+	constructor(x,z){
+  
+  let loader = new THREE.TextureLoader();
+    // load a resource
+  loader.load(
+    // URL ...
+    'https://i.imgur.com/M2tr5Tm.png?1',
+    // onLoad ...
+    function(texture) {
+      // do something with the texture
+      // Plane with default texture coordinates [0,1]x[0,1]
+      var texMat = new THREE.MeshBasicMaterial({
+        map: texture,
+        alphaTest:0.5
+      });
+      flameMesh.push(new THREE.Mesh(new THREE.PlaneGeometry(30,30), texMat));
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+    	texture.repeat.set (1/3,1/3);
+      texture.offset.set (0,2/3);
+     
+      flameMesh[flameMesh.length-1].position.set(x,28,z);
+      
+      scene.add(flameMesh[flameMesh.length-1]);
+      
+    },
+		undefined, // onProgress
+    // onError ...
+    function(xhr) {
+      console.log('An error happened');
+    }
+  );
+  
+  this.light = new THREE.PointLight( 0xffffff, 1, 100 );
+  this.light.position.set(x,10,z);
+  scene.add(this.light);
+  
+  candle.push(makeCandle());
+  
+   candle[candle.length-1].position.set(x,0,z);
+   candle[candle.length-1].name = num;
+   num++;
+     //scene.add (candle[candle.length-1]);
+  
+  
+}
+}
+
+init();
+animate();
+
+function init() {
+  renderer = new THREE.WebGLRenderer({
+    antialias: true
+  });
+	renderer.setClearColor (0x888888);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(50, 1, 1, 10000);
+  camera.position.set(150,100,150);
+
+	let controls = new THREE.OrbitControls (camera, renderer.domElement);
+ 	//scene.add (new THREE.GridHelper(200,20,'red','white'));
+  ////////////////////////////////////////////////////////////
+  window.addEventListener('resize', onWindowResize, false);
+  const geometry = new THREE.PlaneGeometry( 200, 200 );
+	const material = new THREE.MeshPhongMaterial( {color: 'white'} );
+	const plane = new THREE.Mesh( geometry, material );
+  plane.rotation.x = -Math.PI/2;
+	scene.add( plane );
+  
+  //makeFlame2();
+  indiv.push(new Flame(10,10));
+  indiv.push(new Flame(-30,40));
+  indiv.push(new Flame(-50,-80));
+  indiv.push(new Flame(-80,0));
+  indiv.push(new Flame(60,50));
+      
+      objects = new THREE.Group();
+      for(var i = 0 ; i < candle.length ; i++  )
+      objects.add(candle[i]);
+      scene.add(objects);
+      
+     
+  
+  pickables = [ objects ];
+
+  raycaster = new THREE.Raycaster();
+  document.addEventListener('pointerdown', onDocumentMouseDown, false);
+  document.addEventListener('pointermove', onDocumentMouseOver, false);
+  
+  
+  flameInterval = setInterval (textureAnimate, 100);
+  
+}
+
+function onDocumentMouseDown(event) {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  // find intersections
+  raycaster.setFromCamera(mouse, camera);
+  var intersects = raycaster.intersectObjects(pickables, true);
+  if (intersects.length > 0) {
+
+  for(var i = 0 ; i < indiv.length ; i++  )
+  {
+		indiv[i].light.intensity = 0;
+    clearInterval (flameInterval);
+    flameMesh[i].material.visible = false;
+    }
+    
+    setTimeout(
+    function(){
+    flameInterval = setInterval (textureAnimate, 100);
+    for(var i = 0 ; i < indiv.length ; i++  )
+    {
+		indiv[i].light.intensity = 1;
+ 
+    
+    flameMesh[i].material.visible = true;
+    }
+    }, 3000);
+   
+	}
+}
+
+function onDocumentMouseOver(event) {
+	event.preventDefault();  // may not be necessary
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  // find intersections
+  raycaster.setFromCamera(mouse, camera);
+  var intersects = raycaster.intersectObjects(pickables, true);
+  if (intersects.length > 0) {
+    document.body.style.cursor = 'pointer';
+  } else {
+    document.body.style.cursor = 'auto';
+  }
+
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function textureAnimate() {
+  textureAnimate.count = (textureAnimate.count === undefined) ? 1 : textureAnimate.count;
+
+//console.log (textureAnimate.count)
+	if (flameMesh!== undefined) {
+  
+    var texture = [];
+    for(var i = 0 ; i < flameMesh.length ; i++  )
+    texture.push(flameMesh[i].material.map);
+  //console.log (`${textureAnimate.count}: [${texture.offset.x},${texture.offset.y}]`);
+  
+  for(var i = 0 ; i < flameMesh.length ; i++  )
+    texture[i].offset.x += 1/3;
+ 
+ 		if (textureAnimate.count % 3 === 0) {
+    for(var i = 0 ; i < flameMesh.length ; i++  )
+    	texture[i].offset.y -= 1/3;
+    }
+    textureAnimate.count++;
+  }
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  render();
+  
+  // billboard
+  // candle.lookAt (camera.position)  // does not work
+  //candle.lookAt (camera.position.x, 0, camera.position.z);
+  
+}
+
+function render() {
+  renderer.render(scene, camera);
+}
+
+
+
+</script>
+</body>
+
+</html>
